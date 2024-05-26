@@ -12,15 +12,23 @@ public class NewBehaviourScript : MonoBehaviour
     [SerializeField]
     private float runSpeed;
     private float applySpeed;
+    [SerializeField]
+    private float crouchSpeed;
 
     //점프
     [SerializeField]
     private float jumpForce;
 
-
     //상태변수
     private bool isRun = false;
     private bool isGround = true;
+    private bool isCrouch = false;
+
+    //앉았을 때 얼마나 앉을지 결정 변수.
+    [SerializeField]
+    private float crouchPosY;
+    private float originPosY;
+    private float applyCrouchPosY;
 
     //땅 착지 여부
     private CapsuleCollider capsuleCollider;
@@ -49,6 +57,12 @@ public class NewBehaviourScript : MonoBehaviour
         //theCamera = FindObjectOfType<Camera>();
         myRigid = GetComponent<Rigidbody>();
         applySpeed = walkSpeed;
+
+        //초기화
+        originPosY = theCamera.transform.localPosition.y;
+        applyCrouchPosY = originPosY;
+
+
     }
 
     // Update is called once per frame
@@ -57,16 +71,67 @@ public class NewBehaviourScript : MonoBehaviour
         IsGround();
         TryJump();
         TryRun();
+        TryCrouch();
         Move();
         CameraRotation();
         CharacterRotation();
     }
 
+    //앉기 시도
+    private void TryCrouch()
+    {
+        if(Input.GetKeyDown(KeyCode.LeftControl))
+        {
+            Crouch();
+        }
+    }
+
+    //앉기 동작
+    private void Crouch()
+    {
+        isCrouch = !isCrouch;
+
+        if(isCrouch)
+        {
+            applySpeed = crouchSpeed;
+            applyCrouchPosY = crouchPosY;
+        }
+        else
+        {
+            applySpeed = walkSpeed ; 
+            applyCrouchPosY = originPosY;
+        }
+
+        StartCoroutine(CrouchCoroutine());
+    }
+    //부드러운 앉기 동작
+    IEnumerator CrouchCoroutine()
+    {
+        float _posY = theCamera.transform.localPosition.y;
+        int count = 0;
+
+        while(_posY != applyCrouchPosY)
+        {   
+            count++;
+            _posY = Mathf.Lerp(_posY , applyCrouchPosY , 0.2f);
+            theCamera.transform.localPosition = new Vector3(0,_posY,0);
+            if(count == 15)
+            {
+                break;
+            }
+            yield return null;
+        }
+        theCamera.transform.localPosition = new Vector3(0,applyCrouchPosY,0f);
+        
+    }
+
+    //지면에 있는지 체크
     private void IsGround()
     {
         isGround = Physics.Raycast(transform.position, Vector3.down, capsuleCollider.bounds.extents.y + 0.1f);
     }
     
+    //점프 시도
     private void TryJump()
     {
         if (Input.GetKeyDown(KeyCode.Space) && isGround)
@@ -75,11 +140,13 @@ public class NewBehaviourScript : MonoBehaviour
         }
     }
 
+    //점프 시도
     private void Jump()
-    {
-         myRigid.velocity = transform.up * jumpForce;
+    {   
+        myRigid.velocity = transform.up * jumpForce;
     }
 
+    //달리기 시도ㄴ
     private void TryRun()
     {
         if(Input.GetKey(KeyCode.LeftShift))
@@ -91,7 +158,7 @@ public class NewBehaviourScript : MonoBehaviour
             runningCancel();
         }
     }
-
+    //달리기
     private void running()
     {
 
@@ -99,12 +166,14 @@ public class NewBehaviourScript : MonoBehaviour
         applySpeed = runSpeed;
 
     }
+    //달리기 취소
     private void runningCancel()
     {
         isRun = false;
         applySpeed = walkSpeed;
     }
     
+    //움직임 실행
     private void Move()
     {
         float _moveDirX = Input.GetAxisRaw("Horizontal");
